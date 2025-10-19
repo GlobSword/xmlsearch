@@ -15,8 +15,8 @@ import (
 
 type XMLUser struct {
 	ID        int    `xml:"id"`
-	FirstName string `xml:"First_name"`
-	LastName  string `xml:"Last_name"`
+	FirstName string `xml:"first_name"`
+	LastName  string `xml:"last_name"`
 	Age       int    `xml:"age"`
 	About     string `xml:"about"`
 	Gender    string `xml:"gender"`
@@ -200,6 +200,15 @@ func sortUsers(users []User, orderField string, orderBy int) error {
 				return users[i].Id > users[j].Id
 			} else if orderBy == OrderByAsc { // -1
 				return users[i].Id < users[j].Id
+			}
+			return false
+		})
+	case "Age":
+		sort.Slice(users, func(i, j int) bool {
+			if orderBy == OrderByDesc {
+				return users[i].Age > users[j].Age
+			} else if orderBy == OrderByAsc {
+				return users[i].Age < users[j].Age
 			}
 			return false
 		})
