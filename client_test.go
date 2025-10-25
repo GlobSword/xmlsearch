@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 func SearchServerTest(w http.ResponseWriter, r *http.Request) {
@@ -191,6 +192,370 @@ func applyPaginationTest(users []User, offset, limit int) []User {
 		end = len(users)
 	}
 	return users[offset:end]
+}
+
+// ===== ТАБЛИЧНОЕ ТЕСТИРОВАНИЕ УСПЕШНЫХ КЕЙСОВ =====
+func TestFindUsers_Success(t *testing.T) {
+	testServer := httptest.NewServer(http.HandlerFunc(SearchServerTest))
+	defer testServer.Close()
+
+	testCases := []struct {
+		name        string
+		request     SearchRequest
+		checkResult func(t *testing.T, resp *SearchResponse, err error)
+	}{
+		{
+			name: "basic_all_users",
+			request: SearchRequest{
+				Limit:  5,
+				Offset: 0,
+			},
+			checkResult: func(t *testing.T, resp *SearchResponse, err error) {
+				if err != nil {
+					t.Errorf("213-unexpected error: %v", err)
+					return
+				}
+				if len(resp.Users) == 0 {
+					t.Error("217-expected users")
+				}
+			},
+		},
+		{
+			name: "search_with_query",
+			request: SearchRequest{
+				Limit: 10,
+				Query: "Boyd",
+			},
+			checkResult: func(t *testing.T, resp *SearchResponse, err error) {
+				if err != nil {
+					t.Errorf("230-unexpected error: %v", err)
+					return
+				}
+				for _, user := range resp.Users {
+					hasBoyd := strings.Contains(strings.ToLower(user.Name), "boyd") || strings.Contains(strings.ToLower(user.About), "boyd")
+					if !hasBoyd {
+						t.Errorf("236-user %s doesn't contain 'Boyd'", user.Name)
+					}
+				}
+			},
+		},
+		{
+			name: "order_by_age_asc",
+			request: SearchRequest{
+				Limit:      5,
+				OrderField: "Age",
+				OrderBy:    OrderByAsc,
+			},
+			checkResult: func(t *testing.T, resp *SearchResponse, err error) {
+				if err != nil {
+					t.Errorf("250-unexpected error: %v", err)
+					return
+				}
+				if len(resp.Users) < 2 {
+					return
+				}
+				for i := 0; i < len(resp.Users)-1; i++ {
+					if resp.Users[i].Age > resp.Users[i+1].Age {
+						t.Errorf("258-not sorted by age asc")
+					}
+				}
+			},
+		},
+		{
+			name: "order_by_age_desc",
+			request: SearchRequest{
+				Limit:      5,
+				OrderField: "Age",
+				OrderBy:    OrderByDesc,
+			},
+			checkResult: func(t *testing.T, resp *SearchResponse, err error) {
+				if err != nil {
+					t.Errorf("272-unexpected error: %v", err)
+					return
+				}
+				if len(resp.Users) < 2 {
+					return
+				}
+				for i := 0; i < len(resp.Users)-1; i++ {
+					if resp.Users[i].Age < resp.Users[i+1].Age {
+						t.Errorf("280-not sorted by age desc")
+					}
+				}
+			},
+		},
+		{
+			name: "order_by_age_id",
+			request: SearchRequest{
+				Limit:      5,
+				OrderField: "Id",
+				OrderBy:    OrderByAsc,
+			},
+			checkResult: func(t *testing.T, resp *SearchResponse, err error) {
+				if err != nil {
+					t.Errorf("294-unexpected error: %v", err)
+				}
+			},
+		},
+		{
+			name: "order_by_name",
+			request: SearchRequest{
+				Limit:      5,
+				OrderField: "Name",
+				OrderBy:    OrderByAsc,
+			},
+			checkResult: func(t *testing.T, resp *SearchResponse, err error) {
+				if err != nil {
+					t.Errorf("307-unexpected error: %v", err)
+				}
+			},
+		},
+		{
+			name: "with_offset",
+			request: SearchRequest{
+				Limit:  2,
+				Offset: 1,
+			},
+			checkResult: func(t *testing.T, resp *SearchResponse, err error) {
+				if err != nil {
+					t.Errorf("331-unexpected error: %v", err)
+				}
+			},
+		},
+		{
+			name: "empty_result",
+			request: SearchRequest{
+				Limit: 5,
+				Query: "NonexistentUser12345",
+			},
+			checkResult: func(t *testing.T, resp *SearchResponse, err error) {
+				if err != nil {
+					t.Errorf("343-unexpected error: %v", err)
+					return
+				}
+				if len(resp.Users) != 0 {
+					t.Error("347-expected empty result")
+				}
+			},
+		},
+		{
+			name: "next_page_true",
+			request: SearchRequest{
+				Limit: 1,
+			},
+			checkResult: func(t *testing.T, resp *SearchResponse, err error) {
+				if err != nil {
+					t.Errorf("358-unexpected error: %v", err)
+					return
+				}
+				if !resp.NextPage {
+					t.Error("362-NextPage should be true")
+				}
+			},
+		},
+		{
+			name: "limit_25_capped",
+			request: SearchRequest{
+				Limit: 30, // будет обрезан до 25
+			},
+			checkResult: func(t *testing.T, resp *SearchResponse, err error) {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+					return
+				}
+				// limit обрезается до 25, +1 для NextPage, итого макс 25 пользователей
+				if len(resp.Users) > 25 {
+					t.Errorf("expected max 25 users, got %d", len(resp.Users))
+				}
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			client := &SearchClient{
+				AccessToken: "test_token",
+				URL:         testServer.URL,
+			}
+			resp, err := client.FindUsers(tc.request)
+			tc.checkResult(t, resp, err)
+		})
+	}
+}
+
+// ===== ТЕСТЫ КЛИЕНТСКИХ ОШИБОК =====
+func TestFindUsers_ClientErrors(t *testing.T) {
+	testServer := httptest.NewServer(http.HandlerFunc(SearchServerTest))
+	defer testServer.Close()
+
+	testCases := []struct {
+		name          string
+		request       SearchRequest
+		expectedError string
+	}{
+		{
+			name: "negative_limit",
+			request: SearchRequest{
+				Limit: -1,
+			},
+			expectedError: "limit must be > 0",
+		},
+		{
+			name: "negative_offset",
+			request: SearchRequest{
+				Limit:  5,
+				Offset: -1,
+			},
+			expectedError: "offset must be > 0",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			client := &SearchClient{
+				AccessToken: "test_token",
+				URL:         testServer.URL,
+			}
+			_, err := client.FindUsers(tc.request)
+			if err == nil {
+				t.Errorf("expected error: %s", tc.expectedError)
+				return
+			}
+			if !strings.Contains(err.Error(), tc.expectedError) {
+				t.Errorf("expected error '%s', got: %v", tc.expectedError, err)
+			}
+		})
+	}
+}
+
+// ===== ШАГ 8: СЕРВЕРНЫЕ ОШИБКИ =====
+
+// SearchServerErrors - хендлер для эмуляции серверных ошибок
+
+func SearchServerErrors(w http.ResponseWriter, r *http.Request) {
+	errorType := r.URL.Query().Get("error_type")
+
+	switch errorType {
+	case "unauthorized":
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+	case "internal_server_error":
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	case "bad_order_field":
+		errorResponse := map[string]string{"Error": "ErrorBadOrderField"}
+		w.WriteHeader(http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(errorResponse)
+	case "bad_json":
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("invalid json {"))
+	case "unknown_bad_request":
+		errorResponse := map[string]string{"Error": "UnknownError"}
+		w.WriteHeader(http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(errorResponse)
+	case "bad_error_json":
+		w.WriteHeader(http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("invalid error json"))
+	default:
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode([]User{})
+	}
+}
+
+// Табличное тестирование серверных ошибок
+func TestFindUsers_ServerErrors(t *testing.T) {
+	errorServer := httptest.NewServer(http.HandlerFunc(SearchServerErrors))
+	defer errorServer.Close()
+
+	testCases := []struct {
+		name          string
+		errorType     string
+		expectedError string
+	}{
+		{
+			name:          "unauthorized",
+			errorType:     "unauthorized",
+			expectedError: "Bad AccessToken",
+		},
+		{
+			name:          "internal_server_error",
+			errorType:     "internal_server_error",
+			expectedError: "SearchServer fatal error",
+		},
+		{
+			name:          "bad_order_field",
+			errorType:     "bad_order_field",
+			expectedError: "OrderFeld",
+		},
+		{
+			name:          "bad_json_response",
+			errorType:     "bad_json",
+			expectedError: "can't unpack error json",
+		},
+		{
+			name:          "unknown_bad_request",
+			errorType:     "unknown_bad_request",
+			expectedError: "unknown_bad_request error",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			client := &SearchClient{
+				AccessToken: "test_token",
+				URL:         errorServer.URL + "?error_type=" + tc.errorType,
+			}
+			_, err := client.FindUsers(SearchRequest{Limit: 5})
+			if err == nil {
+				t.Errorf("expected error for %s", tc.name)
+				return
+			}
+			if !strings.Contains(err.Error(), tc.expectedError) {
+				t.Errorf("expected '%s', got: %v", tc.expectedError, err)
+			}
+		})
+	}
+}
+
+// Тест таймаута
+
+func TestFindUsers_Timeout(t *testing.T) {
+	slowServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(2 * time.Second)
+		w.Write([]byte("[]"))
+	})) // Почему 2 скобки и в каких случаях это нужно?
+
+	defer slowServer.Close()
+
+	client := &SearchClient{
+		AccessToken: "test_token",
+		URL:         slowServer.URL,
+	}
+
+	_, err := client.FindUsers(SearchRequest{Limit: 5})
+	if err == nil {
+		t.Errorf("expected timeout error")
+		return
+	}
+	if !strings.Contains(err.Error(), "timeout") {
+		t.Errorf("expected timeout error, got: %v", err)
+	}
+}
+
+// Тест unknown error (невалидный URL)
+func TestFindUsers_unknownError(t *testing.T) {
+	client := &SearchClient{
+		AccessToken: "test_token",
+		URL:         "http://\x00invalidurl", // невалидный URL
+	}
+	_, err := client.FindUsers(SearchRequest{Limit: 5})
+	if err == nil {
+		t.Errorf("expected unknown error")
+		return
+	}
+	if !strings.Contains(err.Error(), "unknown error") {
+		t.Errorf("expected unknown error, got: %v", err)
+	}
 }
 
 // ===== ШАГ 5: ПЕРВЫЙ ПРОСТОЙ ТЕСТ =====
