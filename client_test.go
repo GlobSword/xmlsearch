@@ -554,7 +554,9 @@ func TestFindUsers_Timeout(t *testing.T) {
 func TestFindUsers_UnknownError(t *testing.T) {
 	client := &SearchClient{
 		AccessToken: "test_token",
-		URL:         "http://\x00invalid",
+		// URL:         "http://\x00invalid",
+		// Используем несуществующий хост вместо невалидного URL
+		URL: "http://127.0.0.1:0",
 	}
 
 	resp, err := client.FindUsers(SearchRequest{Limit: 5})
