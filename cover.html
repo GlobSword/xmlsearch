@@ -55,9 +55,9 @@
 			<div id="nav">
 				<select id="files">
 				
-				<option value="file0">hw4/client.go (59.5%)</option>
+				<option value="file0">hw4/client.go (100.0%)</option>
 				
-				<option value="file1">hw4/main.go (9.2%)</option>
+				<option value="file1">hw4/main.go (0.0%)</option>
 				
 				</select>
 			</div>
@@ -135,13 +135,13 @@ func (srv *SearchClient) FindUsers(req SearchRequest) (*SearchResponse, error) <
 
         searcherParams := url.Values{}
 
-        if req.Limit &lt; 0 </span><span class="cov0" title="0">{
+        if req.Limit &lt; 0 </span><span class="cov8" title="1">{
                 return nil, fmt.Errorf("limit must be &gt; 0")
         }</span>
-        <span class="cov8" title="1">if req.Limit &gt; 25 </span><span class="cov0" title="0">{
+        <span class="cov8" title="1">if req.Limit &gt; 25 </span><span class="cov8" title="1">{
                 req.Limit = 25
         }</span>
-        <span class="cov8" title="1">if req.Offset &lt; 0 </span><span class="cov0" title="0">{
+        <span class="cov8" title="1">if req.Offset &lt; 0 </span><span class="cov8" title="1">{
                 return nil, fmt.Errorf("offset must be &gt; 0")
         }</span>
 
@@ -158,35 +158,35 @@ func (srv *SearchClient) FindUsers(req SearchRequest) (*SearchResponse, error) <
         searcherReq.Header.Add("AccessToken", srv.AccessToken)
 
         resp, err := client.Do(searcherReq)
-        if err != nil </span><span class="cov0" title="0">{
-                if err, ok := err.(net.Error); ok &amp;&amp; err.Timeout() </span><span class="cov0" title="0">{
+        if err != nil </span><span class="cov8" title="1">{
+                if err, ok := err.(net.Error); ok &amp;&amp; err.Timeout() </span><span class="cov8" title="1">{
                         return nil, fmt.Errorf("timeout for %s", searcherParams.Encode())
                 }</span>
-                <span class="cov0" title="0">return nil, fmt.Errorf("unknown error %s", err)</span>
+                <span class="cov8" title="1">return nil, fmt.Errorf("unknown error %s", err)</span>
         }
         <span class="cov8" title="1">defer resp.Body.Close()
         body, err := ioutil.ReadAll(resp.Body)
 
         switch resp.StatusCode </span>{
-        case http.StatusUnauthorized:<span class="cov0" title="0">
+        case http.StatusUnauthorized:<span class="cov8" title="1">
                 return nil, fmt.Errorf("Bad AccessToken")</span>
-        case http.StatusInternalServerError:<span class="cov0" title="0">
+        case http.StatusInternalServerError:<span class="cov8" title="1">
                 return nil, fmt.Errorf("SearchServer fatal error")</span>
-        case http.StatusBadRequest:<span class="cov0" title="0">
+        case http.StatusBadRequest:<span class="cov8" title="1">
                 errResp := SearchErrorResponse{}
                 err = json.Unmarshal(body, &amp;errResp)
-                if err != nil </span><span class="cov0" title="0">{
+                if err != nil </span><span class="cov8" title="1">{
                         return nil, fmt.Errorf("cant unpack error json: %s", err)
                 }</span>
-                <span class="cov0" title="0">if errResp.Error == "ErrorBadOrderField" </span><span class="cov0" title="0">{
+                <span class="cov8" title="1">if errResp.Error == "ErrorBadOrderField" </span><span class="cov8" title="1">{
                         return nil, fmt.Errorf("OrderFeld %s invalid", req.OrderField)
                 }</span>
-                <span class="cov0" title="0">return nil, fmt.Errorf("unknown bad request error: %s", errResp.Error)</span>
+                <span class="cov8" title="1">return nil, fmt.Errorf("unknown bad request error: %s", errResp.Error)</span>
         }
 
         <span class="cov8" title="1">data := []User{}
         err = json.Unmarshal(body, &amp;data)
-        if err != nil </span><span class="cov0" title="0">{
+        if err != nil </span><span class="cov8" title="1">{
                 return nil, fmt.Errorf("cant unpack result json: %s", err)
         }</span>
 
@@ -194,7 +194,7 @@ func (srv *SearchClient) FindUsers(req SearchRequest) (*SearchResponse, error) <
         if len(data) == req.Limit </span><span class="cov8" title="1">{
                 result.NextPage = true
                 result.Users = data[0 : len(data)-1]
-        }</span> else<span class="cov0" title="0"> {
+        }</span> else<span class="cov8" title="1"> {
                 result.Users = data[0:len(data)]
         }</span>
 
@@ -376,8 +376,8 @@ func loadUsersFromXML() ([]User, error) <span class="cov0" title="0">{
 }
 
 // filterUsers фильтрует пользователей по запросу
-func filterUsers(users []User, query string) []User <span class="cov8" title="1">{
-        if query == "" </span><span class="cov8" title="1">{
+func filterUsers(users []User, query string) []User <span class="cov0" title="0">{
+        if query == "" </span><span class="cov0" title="0">{
                 return users
         }</span>
 
@@ -393,11 +393,11 @@ func filterUsers(users []User, query string) []User <span class="cov8" title="1"
 }
 
 // sortUsers сортирует пользователей
-func sortUsers(users []User, orderField string, orderBy int) error <span class="cov8" title="1">{
-        if orderField == "" </span><span class="cov8" title="1">{
+func sortUsers(users []User, orderField string, orderBy int) error <span class="cov0" title="0">{
+        if orderField == "" </span><span class="cov0" title="0">{
                 orderField = "Name"
         }</span>
-        <span class="cov8" title="1">switch orderField </span>{
+        <span class="cov0" title="0">switch orderField </span>{
         case "Id":<span class="cov0" title="0">
                 sort.Slice(users, func(i, j int) bool </span><span class="cov0" title="0">{
                         if orderBy == OrderByDesc </span><span class="cov0" title="0">{ // 1
@@ -416,32 +416,32 @@ func sortUsers(users []User, orderField string, orderBy int) error <span class="
                         }</span>
                         <span class="cov0" title="0">return false</span>
                 })
-        case "Name":<span class="cov8" title="1">
-                sort.Slice(users, func(i, j int) bool </span><span class="cov8" title="1">{
+        case "Name":<span class="cov0" title="0">
+                sort.Slice(users, func(i, j int) bool </span><span class="cov0" title="0">{
                         if orderBy == OrderByDesc </span><span class="cov0" title="0">{
                                 return users[i].Name &gt; users[j].Name
-                        }</span> else<span class="cov8" title="1"> if orderBy == OrderByAsc </span><span class="cov0" title="0">{
+                        }</span> else<span class="cov0" title="0"> if orderBy == OrderByAsc </span><span class="cov0" title="0">{
                                 return users[i].Name &lt; users[j].Name
                         }</span>
-                        <span class="cov8" title="1">return false</span>
+                        <span class="cov0" title="0">return false</span>
                 })
         default:<span class="cov0" title="0">
                 return fmt.Errorf("неизвестное поле сортировки: %s", orderField)</span>
         }
-        <span class="cov8" title="1">return nil</span>
+        <span class="cov0" title="0">return nil</span>
 }
 
 // applyPagination применяет offset и limit
-func applyPagination(users []User, offset, limit int) []User <span class="cov8" title="1">{
+func applyPagination(users []User, offset, limit int) []User <span class="cov0" title="0">{
         if offset &gt;= len(users) </span><span class="cov0" title="0">{
                 return []User{} // Если offset больше количества записей
         }</span>
 
-        <span class="cov8" title="1">end := offset + limit
+        <span class="cov0" title="0">end := offset + limit
         if end &gt; len(users) </span><span class="cov0" title="0">{
                 end = len(users)
         }</span>
-        <span class="cov8" title="1">return users[offset:end]</span>
+        <span class="cov0" title="0">return users[offset:end]</span>
 }
 
 // Дополнительный хендлер для тестирования ошибок
